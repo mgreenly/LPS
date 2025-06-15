@@ -1,0 +1,19 @@
+When writing "C" programs the target platform is both x86_86 and AARCH64 Linux.
+
+When writing "C" programs set the compiler flags for the C17 ISO/IEC 9899:2018 standards.
+
+When writing "C" programs use the fixed width integer types defined in "stdint.h" and the fixed width string formatting defined in "inttypes.h".
+
+When writing "C" programs provide a makefile.
+
+When writing "C" programs assume the program is intended for production use.
+
+When writing "C" programs provide an explanation appropriate for an experienced engineer.
+
+Write a "C" program named "server".
+
+The server program should be a simple hello world application that prints "Hello from the server".
+
+Write a "C" program named "client".
+
+The client program should be a simple hello world application that prints "Hello from the client".
