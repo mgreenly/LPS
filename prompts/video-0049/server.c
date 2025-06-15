@@ -151,10 +151,10 @@ static void handle_new_connection(int epoll_fd, int listen_fd) {
         close(client_fd);
         return;
     }
-    
+
     char client_ip[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, INET_ADDRSTRLEN);
-    fprintf(stderr, "puts debug: Accepted connection from %s on fd %d\n", client_ip, client_fd);
+    fprintf(stderr, "debug: Accepted connection from %s on fd %d\n", client_ip, client_fd);
 }
 
 // Disconnects a client and removes it from epoll.
@@ -162,7 +162,7 @@ static void disconnect_client(int epoll_fd, int client_fd) {
     assert(epoll_fd >= 0);
     assert(client_fd >= 0);
 
-    fprintf(stderr, "puts debug: Client on fd %d disconnected.\n", client_fd);
+    fprintf(stderr, "debug: Client on fd %d disconnected.\n", client_fd);
     epoll_ctl(epoll_fd, EPOLL_CTL_DEL, client_fd, NULL);
     close(client_fd);
 }
@@ -176,18 +176,18 @@ static void handle_client_event(int epoll_fd, struct epoll_event *event) {
 
     // Check for hang-up or error conditions first.
     if ((event->events & EPOLLHUP) || (event->events & EPOLLERR)) {
-        fprintf(stderr, "puts debug: EPOLLHUP or EPOLLERR on fd %d\n", client_fd);
+        fprintf(stderr, "debug: EPOLLHUP or EPOLLERR on fd %d\n", client_fd);
         disconnect_client(epoll_fd, client_fd);
         return;
     }
 
     // Check for incoming data.
     if (event->events & EPOLLIN) {
-        fprintf(stderr, "puts debug: EPOLLIN on fd %d\n", client_fd);
+        fprintf(stderr, "debug: EPOLLIN on fd %d\n", client_fd);
 
         MessageHeader header;
         ssize_t bytes_read = read_full(client_fd, &header, sizeof(header));
-        
+
         if (bytes_read <= 0) {
             // 0 means clean disconnect, -1 means error (e.g. ECONNRESET)
             disconnect_client(epoll_fd, client_fd);
@@ -198,7 +198,7 @@ static void handle_client_event(int epoll_fd, struct epoll_event *event) {
         header.type = ntohl(header.type);
         header.length = ntohl(header.length);
 
-        fprintf(stderr, "puts debug: Received header on fd %d: type=%" PRIu32 ", len=%" PRIu32 "\n",
+        fprintf(stderr, "debug: Received header on fd %d: type=%" PRIu32 ", len=%" PRIu32 "\n",
                 client_fd, header.type, header.length);
 
         if (header.length > 0) {
@@ -211,7 +211,7 @@ static void handle_client_event(int epoll_fd, struct epoll_event *event) {
 
             bytes_read = read_full(client_fd, body, header.length);
             if (bytes_read <= 0) {
-                fprintf(stderr, "puts debug: Failed to read body or client disconnected after header on fd %d\n", client_fd);
+                fprintf(stderr, "debug: Failed to read body or client disconnected after header on fd %d\n", client_fd);
                 free(body);
                 disconnect_client(epoll_fd, client_fd);
                 return;
@@ -236,7 +236,7 @@ static void process_message(int client_fd, const MessageHeader *header, const ch
 
     switch (header->type) {
         case MSG_ECHO: {
-            fprintf(stderr, "puts debug: Processing ECHO for fd %d\n", client_fd);
+            fprintf(stderr, "debug: Processing ECHO for fd %d\n", client_fd);
             response_header.length = htonl(header->length);
             // Send header and body back as is
             send_full(client_fd, &response_header, sizeof(response_header));
@@ -246,12 +246,12 @@ static void process_message(int client_fd, const MessageHeader *header, const ch
             break;
         }
         case MSG_REVERSE: {
-            fprintf(stderr, "puts debug: Processing REVERSE for fd %d\n", client_fd);
+            fprintf(stderr, "debug: Processing REVERSE for fd %d\n", client_fd);
             char *reversed_body = strndup(body, header->length);
             if (!reversed_body) break;
             // Reverse in place, excluding the null terminator
             reverse_string(reversed_body, strnlen(reversed_body, header->length));
-            
+
             response_header.length = htonl(header->length);
             send_full(client_fd, &response_header, sizeof(response_header));
             send_full(client_fd, reversed_body, header->length);
@@ -259,12 +259,12 @@ static void process_message(int client_fd, const MessageHeader *header, const ch
             break;
         }
         case MSG_TIME: {
-            fprintf(stderr, "puts debug: Processing TIME for fd %d\n", client_fd);
+            fprintf(stderr, "debug: Processing TIME for fd %d\n", client_fd);
             char time_str[TIME_BUFFER_SIZE];
             time_t now = time(NULL);
             struct tm *t = gmtime(&now);
             strftime(time_str, sizeof(time_str), "%Y-%m-%dT%H:%M:%SZ", t);
-            
+
             uint32_t body_len = strlen(time_str) + 1; // Include null terminator
             response_header.length = htonl(body_len);
             send_full(client_fd, &response_header, sizeof(response_header));

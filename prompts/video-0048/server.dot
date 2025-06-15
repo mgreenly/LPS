@@ -1,0 +1,60 @@
+digraph ServerFlow {
+    rankdir=TB;
+    node [shape=box, style=rounded];
+
+    subgraph cluster_setup {
+        label="Initialization";
+        style=filled;
+        color=lightgrey;
+        node [style=filled,color=white];
+
+        Start [label="Start Server"];
+        CreateSocket [label="Create Listener Socket\n(socket, setsockopt)"];
+        BindListen [label="Bind to Port 4242\nand Listen"];
+        CreateEpoll [label="Create Epoll Instance\n(epoll_create1)"];
+        AddListener [label="Add Listener Socket\n to Epoll"];
+        
+        Start -> CreateSocket -> BindListen -> CreateEpoll -> AddListener;
+    }
+
+    subgraph cluster_loop {
+        label="Event Loop";
+        style=filled;
+        color=lightblue;
+        
+        EpollWait [label="Wait for Events\n(epoll_wait)", shape=ellipse, style=filled, color=white];
+        
+        IsListenerEvent [label="Event on Listener?", shape=diamond, style=filled, color=yellow];
+        
+        subgraph cluster_new_conn {
+            label = "Handle New Connection";
+            AcceptConn [label="Accept Connection\n(accept)"];
+            SetNonBlocking [label="Set Client Socket\n to Non-Blocking"];
+            AddClientToEpoll [label="Add Client Socket\n to Epoll"];
+            AcceptConn -> SetNonBlocking -> AddClientToEpoll;
+        }
+
+        subgraph cluster_client_data {
+            label = "Handle Client Data";
+            HandleData [label="Read data from socket"];
+            ProcessMessages [label="Process complete messages\nin buffer"];
+            SendResponse [label="Send response(s)"];
+            IsDisconnect [label="Client Disconnected?", shape=diamond, style=filled, color=yellow];
+            CloseClient [label="Close Client Socket"];
+
+            HandleData -> IsDisconnect;
+            IsDisconnect -> ProcessMessages [label="No (data read)"];
+            IsDisconnect -> CloseClient [label="Yes (EOF or error)"];
+            ProcessMessages -> SendResponse;
+        }
+
+        EpollWait -> IsListenerEvent;
+        IsListenerEvent -> AcceptConn [label="Yes"];
+        IsListenerEvent -> HandleData [label="No (event on client)"];
+        AddClientToEpoll -> EpollWait;
+        SendResponse -> EpollWait;
+        CloseClient -> EpollWait;
+    }
+    
+    AddListener -> EpollWait;
+}

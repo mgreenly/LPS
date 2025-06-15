@@ -1,0 +1,44 @@
+// server.dot
+digraph ServerFlow {
+    rankdir=TB;
+    node [shape=box, style=rounded];
+    
+    Start [label="Start Server"];
+    CreateSocket [label="Create & Configure\nListening Socket (TCP)"];
+    BindListen [label="Bind to Port 4242\n& Listen for Connections"];
+    CreateEpoll [label="Create Epoll Instance"];
+    AddListenFD [label="Add Listening FD\nto Epoll Set"];
+    EpollWait [label="epoll_wait()\n(Block until I/O event)"];
+    
+    EventLoop [shape=diamond, label="New Event?"];
+    IsNewConnection [shape=diamond, label="Event on\nListening FD?"];
+    
+    Accept [label="accept() New Connection"];
+    SetNonBlocking [label="Set Client FD\nto Non-Blocking"];
+    AddClientFD [label="Add Client FD to Epoll Set\nStore connection state ptr"];
+    
+    EventIsError [shape=diamond, label="EPOLLHUP or\nEPOLLERR?"];
+    CloseConnection [label="Close Connection:\n- Remove FD from Epoll\n- close(fd)\n- free(state)"];
+    
+    EventIsData [shape=diamond, label="EPOLLIN?"];
+    ReadData [label="read() data into\nconnection's buffer"];
+    ProcessBuffer [label="Loop: Process Complete\nMessages in Buffer"];
+    
+    Start -> CreateSocket -> BindListen -> CreateEpoll -> AddListenFD -> EpollWait;
+    EpollWait -> EventLoop;
+    
+    EventLoop -> IsNewConnection;
+    IsNewConnection -> Accept [label="yes"];
+    IsNewConnection -> EventIsError [label="no"];
+    
+    Accept -> SetNonBlocking -> AddClientFD -> EpollWait;
+    
+    EventIsError -> CloseConnection [label="yes"];
+    EventIsError -> EventIsData [label="no"];
+    
+    EventIsData -> ReadData [label="yes"];
+    EventIsData -> EpollWait [label="no"];
+    
+    ReadData -> ProcessBuffer -> EpollWait;
+    CloseConnection -> EpollWait;
+}

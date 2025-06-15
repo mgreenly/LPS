@@ -1,0 +1,52 @@
+digraph ClientFlow {
+    rankdir=TB;
+    node [shape=box, style=rounded];
+    
+    subgraph cluster_setup {
+        label="Initialization";
+        style=filled;
+        color=lightgrey;
+        node [style=filled,color=white];
+        
+        Start [label="Start Client"];
+        SetupSignals [label="Setup Signal Handlers\n(SIGINT, SIGTERM)"];
+        CreateSocket [label="Create Socket"];
+        ConnectServer [label="Connect to Server\n(localhost:4242)"];
+        
+        Start -> SetupSignals -> CreateSocket -> ConnectServer;
+    }
+    
+    subgraph cluster_loop {
+        label="Main Loop";
+        style=filled;
+        color=lightblue;
+        
+        LoopCondition [label="while (running)", shape=diamond, style=filled, color=yellow];
+        RandomPause [label="Random Pause\n(0.3s - 1.0s)"];
+        SelectMessage [label="Randomly Select\nMessage Type"];
+        CreateMessage [label="Create Message\n(Header + Body)"];
+        SendMessage [label="Send Message to Server"];
+        ReadResponse [label="Read Full Response\n(Header then Body)"];
+        LogResponse [label="Print Response"];
+        
+        LoopCondition -> RandomPause [label="True"];
+        RandomPause -> SelectMessage -> CreateMessage -> SendMessage -> ReadResponse -> LogResponse -> LoopCondition;
+    }
+
+    subgraph cluster_shutdown {
+        label="Shutdown";
+        style=filled;
+        color=salmon;
+        
+        SignalCaught [label="Signal Caught\n(SIGINT/SIGTERM)", shape=invhouse, style=filled, color=orange];
+        SetFlag [label="Set running = 0"];
+        CloseConnection [label="Close Socket"];
+        End [label="Exit Gracefully"];
+        
+        SignalCaught -> SetFlag;
+        LoopCondition -> CloseConnection [label="False"];
+        CloseConnection -> End;
+    }
+    
+    ConnectServer -> LoopCondition;
+}

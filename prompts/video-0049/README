@@ -1,0 +1,3 @@
+it seems like fulL_read is using a blocking read?
+
+what happens if full_read doesn't get a full message? 

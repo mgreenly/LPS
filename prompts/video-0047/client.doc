@@ -1,0 +1,33 @@
+// client.dot
+digraph ClientFlow {
+    rankdir=TB;
+    node [shape=box, style=rounded];
+
+    Start [label="Start Client"];
+    SetupSignals [label="Install Signal Handlers\n(SIGINT, SIGTERM)"];
+    Connect [label="Create Socket &\nConnect to Server"];
+    
+    MainLoop [shape=diamond, label="while (running)"];
+    Pause [label="Random Pause\n(0.3 - 1.0s)"];
+    
+    SelectMessage [label="Randomly Select\nMessage Type"];
+    CreateMessage [label="Create Message Header & Body"];
+    SendMessage [label="Send Header & Body\nto Server"];
+    
+    ReceiveResponse [label="Receive Header & Body\nfrom Server"];
+    LogResponse [label="Log Server Response"];
+    
+    CheckSignal [shape=diamond, label="running flag still set?"];
+    
+    CloseConnection [label="Close Socket\n& Exit Cleanly"];
+    
+    Start -> SetupSignals -> Connect -> MainLoop;
+    MainLoop -> Pause [label="true"];
+    MainLoop -> CloseConnection [label="false"];
+    
+    Pause -> CheckSignal;
+    CheckSignal -> SelectMessage [label="true"];
+    CheckSignal -> MainLoop [label="false"];
+    
+    SelectMessage -> CreateMessage -> SendMessage -> ReceiveResponse -> LogResponse -> MainLoop;
+}
