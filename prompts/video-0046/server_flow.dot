@@ -1,72 +1,75 @@
-digraph ServerLogic {
+digraph ServerFlow {
     rankdir=TB;
-    node [shape=box, style="rounded,filled", fillcolor=lightgrey];
+    node [shape=box, style="rounded,filled", fillcolor=lightblue];
     edge [fontsize=10];
 
-    // Nodes
-    start [label="Start Server", shape=ellipse, fillcolor=lightblue];
-    setup_socket [label="Create, Bind & Listen on\nlocalhost:4242"];
-    set_nonblocking [label="Set Listen Socket to Non-Blocking"];
-    create_epoll [label="Create Epoll Instance\n(epoll_create1)"];
-    add_listen_fd [label="Add Listen FD to Epoll\n(EPOLLIN | EPOLLET)"];
-    epoll_loop [label="epoll_wait()", shape=diamond, fillcolor=yellow];
+    subgraph cluster_init {
+        label="Initialization";
+        style="filled";
+        color="lightgrey";
+        node [fillcolor=lightyellow];
+        start [label="Start", shape=ellipse, fillcolor=palegreen];
+        create_socket [label="Create Listen Socket\n(socket, non-blocking)"];
+        set_reuse [label="Set SO_REUSEADDR"];
+        bind_port [label="Bind to localhost:4242"];
+        listen_conn [label="Listen for Connections"];
+        create_epoll [label="Create Epoll Instance\n(epoll_create1)"];
+        add_listen_fd [label="Add Listen FD to Epoll\n(epoll_ctl_add)"];
+        start -> create_socket -> set_reuse -> bind_port -> listen_conn -> create_epoll -> add_listen_fd;
+    }
 
-    event_is_listen [label="Event on Listen FD?", shape=diamond];
-    accept_loop [label="Loop: accept()"];
-    set_conn_nonblocking [label="Set New Connection Non-Blocking"];
-    add_client_fd [label="Add Client FD to Epoll"];
+    subgraph cluster_loop {
+        label="Main Event Loop";
+        style="filled";
+        color="lightgrey";
+        node [fillcolor=lightcyan];
+        
+        epoll_wait [label="Wait for Events\n(epoll_wait)", shape= Mdiamond, fillcolor=deepskyblue];
+        event_is_listen [label="Event on Listen FD?", shape=diamond, fillcolor=lightgoldenrod1];
+        
+        subgraph cluster_accept {
+            label="New Connection";
+            node [fillcolor=honeydew];
+            accept_conn [label="Accept New Connection\n(accept4, non-blocking)"];
+            create_state [label="Allocate ConnectionState"];
+            add_client_fd [label="Add Client FD to Epoll\n(with pointer to State)"];
+            accept_conn -> create_state -> add_client_fd -> epoll_wait [label="Ready for next event"];
+        }
+        
+        subgraph cluster_client_event {
+            label="Client Event";
+            node [fillcolor=mistyrose];
 
-    event_is_client [label="Event on Client FD?"];
-    process_event [label="Process Client Event\n(EPOLLIN | EPOLLHUP | EPOLLERR)"];
-    read_header [label="read_full(header)"];
-    
-    read_ok [label="Read OK?", shape=diamond];
-    
-    read_body [label="malloc(body) & read_full(body)"];
-    
-    process_message [label="Switch on Message Type"];
-    
-    handle_echo [label="Handle Echo:\nWrite back original message", fillcolor=honeydew];
-    handle_reverse [label="Handle Reverse:\nReverse string, write back", fillcolor=honeydew];
-    handle_time [label="Handle Time:\nFormat ISO8601 time, write back", fillcolor=honeydew];
-    
-    client_closed [label="Client Disconnected (read EOF)\nor Error", fillcolor=mistyrose];
-    close_fd [label="Close Client FD\nRemove from Epoll"];
+            handle_event [label="Handle Client Event"];
+            is_error_hup [label="Error or Hangup?", shape=diamond, fillcolor=lightgoldenrod1];
+            is_readable [label="Data to Read (EPOLLIN)?", shape=diamond, fillcolor=lightgoldenrod1];
+            close_conn [label="Close Connection\n(epoll_ctl_del, close, free)", fillcolor=salmon];
 
-    // Flow
-    start -> setup_socket;
-    setup_socket -> set_nonblocking;
-    set_nonblocking -> create_epoll;
-    create_epoll -> add_listen_fd;
-    add_listen_fd -> epoll_loop;
-
-    epoll_loop -> event_is_listen [label="Event(s) Ready"];
-    event_is_listen -> accept_loop [label="Yes"];
-    event_is_listen -> event_is_client [label="No"];
+            handle_event -> is_error_hup;
+            is_error_hup -> close_conn [label="Yes"];
+            is_error_hup -> is_readable [label="No"];
+            
+            subgraph cluster_read_process {
+                label="Read & Process Cycle";
+                node [fillcolor=lightpink];
+                read_data [label="Read Data into Buffer"];
+                is_closed [label="read() returns 0?", shape=diamond, fillcolor=lightgoldenrod1];
+                process_buffer [label="Process complete messages\nin buffer (State Machine)"];
+                
+                is_readable -> read_data [label="Yes"];
+                read_data -> is_closed;
+                is_closed -> close_conn [label="Yes"];
+                is_closed -> process_buffer [label="No"];
+                process_buffer -> epoll_wait [label="Ready for next event"];
+                is_readable -> epoll_wait [label="No"];
+            }
+        }
+        
+        epoll_wait -> event_is_listen;
+        event_is_listen -> accept_conn [label="Yes"];
+        event_is_listen -> handle_event [label="No"];
+        close_conn -> epoll_wait [label="Ready for next event"];
+    }
     
-    accept_loop -> set_conn_nonblocking [label="Connection accepted"];
-    accept_loop -> event_is_client [label="EAGAIN (no more connections)"];
-    set_conn_nonblocking -> add_client_fd;
-    add_client_fd -> accept_loop; // Loop for more accepts
-
-    event_is_client -> process_event [label="Yes"];
-    event_is_client -> epoll_loop [label="No (next event)"];
-    
-    process_event -> read_header;
-    read_header -> read_ok;
-    
-    read_ok -> read_body [label="Yes"];
-    read_ok -> client_closed [label="No (EOF/Error)"];
-    
-    read_body -> process_message;
-    process_message -> handle_echo [label="MSG_ECHO"];
-    process_message -> handle_reverse [label="MSG_REVERSE"];
-    process_message -> handle_time [label="MSG_TIME"];
-    
-    handle_echo -> epoll_loop;
-    handle_reverse -> epoll_loop;
-    handle_time -> epoll_loop;
-    
-    client_closed -> close_fd;
-    close_fd -> epoll_loop;
+    add_listen_fd -> epoll_wait [lhead=cluster_loop];
 }

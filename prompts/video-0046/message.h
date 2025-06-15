@@ -5,16 +5,17 @@
 
 // Defines the types of messages that can be exchanged.
 typedef enum {
-    MSG_ECHO,
-    MSG_REVERSE,
-    MSG_TIME
+    MSG_ECHO = 0,
+    MSG_REVERSE = 1,
+    MSG_TIME = 2
 } MessageType;
 
-// The fixed-size header for every message.
-// The total message size on the wire is sizeof(MessageHeader) + message_len.
-typedef struct {
-    uint32_t type;        // The type of the message, cast from MessageType
-    uint32_t message_len; // The length of the body, including the null terminator
+// The fixed-length message header.
+// The `packed` attribute is crucial to prevent compiler padding, ensuring
+// the struct has the same memory layout on all platforms.
+typedef struct __attribute__((packed)) {
+    uint32_t type;   // The message type, from the MessageType enum.
+    uint32_t length; // The length of the message body that follows.
 } MessageHeader;
 
 #endif // MESSAGE_H

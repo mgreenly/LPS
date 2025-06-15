@@ -2,193 +2,177 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <assert.h>
+#include <time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <time.h>
 #include <signal.h>
 #include <inttypes.h>
 #include <errno.h>
 
 #include "message.h"
 
-#define PORT 4242
+// --- Configuration ---
 #define SERVER_IP "127.0.0.1"
-#define RESPONSE_BUFFER_SIZE 4096
+#define PORT 4242
+#define MIN_SLEEP_MS 300
+#define MAX_SLEEP_MS 1000
 
-// Global flag for signal handling
-volatile sig_atomic_t keep_running = 1;
+// --- Debug Logging ---
+#ifdef DEBUG
+#define DEBUG_LOG(fmt, ...) fprintf(stderr, "DEBUG: %s:%d:%s(): " fmt "\n", \
+    __FILE__, __LINE__, __func__, ##__VA_ARGS__)
+#else
+#define DEBUG_LOG(fmt, ...)
+#endif
 
-// --- Utility Functions (from server, adapted for client) ---
+// --- Global for Signal Handling ---
+// Must be volatile sig_atomic_t for safe signal handling
+static volatile sig_atomic_t g_shutdown_flag = 0;
 
-int read_full(int fd, void *buf, size_t count) {
-    ssize_t bytes_read;
-    size_t total_bytes_read = 0;
-    char *ptr = buf;
-
-    while (total_bytes_read < count) {
-        bytes_read = read(fd, ptr + total_bytes_read, count - total_bytes_read);
-        if (bytes_read == 0) return -1; // EOF
-        if (bytes_read < 0) {
-            perror("read");
-            return -2;
-        }
-        total_bytes_read += bytes_read;
-    }
-    return 0;
-}
-
-int write_full(int fd, const void *buf, size_t count) {
-    ssize_t bytes_written;
-    size_t total_bytes_written = 0;
-    const char *ptr = buf;
-
-    while (total_bytes_written < count) {
-        bytes_written = write(fd, ptr + total_bytes_written, count - total_bytes_written);
-        if (bytes_written < 0) {
-            perror("write");
-            return -1;
-        }
-        total_bytes_written += bytes_written;
-    }
-    return 0;
-}
-
-
-// Signal handler to gracefully shut down
-void handle_signal(int signum) {
-    // In a real application, you might need to be careful what you do here.
-    // Setting a flag is one of the few safe operations.
+void signal_handler(int signum) {
     (void)signum;
-    keep_running = 0;
+    g_shutdown_flag = 1;
 }
 
-void setup_signal_handlers(void) {
-    struct sigaction action;
-    memset(&action, 0, sizeof(action));
-    action.sa_handler = handle_signal;
-    sigaction(SIGINT, &action, NULL);
-    sigaction(SIGTERM, &action, NULL);
-}
+// --- Function Prototypes ---
+ssize_t robust_read(int fd, void *buf, size_t count);
+ssize_t robust_write(int fd, const void *buf, size_t count);
 
-// Main client function
 int main(void) {
-    int sockfd;
-    struct sockaddr_in server_addr;
-    
-    setup_signal_handlers();
-
     // Seed random number generator
     srand(time(NULL));
 
-    // Create socket
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd == -1) {
+    // Setup signal handlers for graceful shutdown
+    struct sigaction sa = {0};
+    sa.sa_handler = signal_handler;
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+
+    printf("Client starting. Press Ctrl+C to exit.\n");
+
+    int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock_fd == -1) {
         perror("socket");
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
-    // Configure server address
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(PORT);
-    if (inet_pton(AF_INET, SERVER_IP, &server_addr.sin_addr) <= 0) {
+    struct sockaddr_in serv_addr = {0};
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(PORT);
+    if (inet_pton(AF_INET, SERVER_IP, &serv_addr.sin_addr) <= 0) {
         perror("inet_pton");
-        close(sockfd);
-        exit(EXIT_FAILURE);
+        close(sock_fd);
+        return EXIT_FAILURE;
     }
 
-    // Connect to server
-    if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+    if (connect(sock_fd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
         perror("connect");
-        close(sockfd);
-        exit(EXIT_FAILURE);
+        close(sock_fd);
+        return EXIT_FAILURE;
     }
 
-    printf("Connected to server. Starting message loop (press Ctrl+C to exit).\n");
-    
-    char response_buffer[RESPONSE_BUFFER_SIZE];
+    printf("Connected to server at %s:%d\n", SERVER_IP, PORT);
 
-    while (keep_running) {
-        // 1. Pause for a random time between 0.3 and 1.0 seconds
-        long nano_sleep = (long)((0.3 + (double)rand() / RAND_MAX * 0.7) * 1e9);
-        struct timespec sleep_time = { .tv_sec = 0, .tv_nsec = nano_sleep };
+    while (!g_shutdown_flag) {
+        // 1. Pause for a random duration
+        long sleep_us = (rand() % (MAX_SLEEP_MS - MIN_SLEEP_MS + 1) + MIN_SLEEP_MS) * 1000;
+        struct timespec sleep_time = { .tv_sec = sleep_us / 1000000, .tv_nsec = (sleep_us % 1000000) * 1000 };
         nanosleep(&sleep_time, NULL);
         
-        if (!keep_running) break;
+        if (g_shutdown_flag) break;
 
-        // 2. Select a random message type and create the message
-        MessageHeader header;
+        // 2. Create a random message
+        MessageHeader header = {0};
         char *body = NULL;
-        const char* type_str = "";
-        
-        header.type = rand() % 3;
+        MessageType msg_type = rand() % 3;
 
-        switch (header.type) {
+        switch(msg_type) {
             case MSG_ECHO: {
-                const char* msg = "A journey of a thousand miles begins with a single step.";
-                body = strdup(msg);
-                header.message_len = strlen(body) + 1;
-                type_str = "ECHO";
+                body = "Hello, this is an echo test.";
+                header.type = MSG_ECHO;
+                header.length = strlen(body) + 1;
                 break;
             }
             case MSG_REVERSE: {
-                const char* msg = "!dlroW ,olleH";
-                body = strdup(msg);
-                header.message_len = strlen(body) + 1;
-                type_str = "REVERSE";
+                body = "gnirts siht esrever esaelP";
+                header.type = MSG_REVERSE;
+                header.length = strlen(body) + 1;
                 break;
             }
             case MSG_TIME: {
-                body = NULL; // No body needed for time request
-                header.message_len = 0;
-                type_str = "TIME";
+                body = ""; // Body is empty for a time request
+                header.type = MSG_TIME;
+                header.length = strlen(body) + 1;
                 break;
             }
         }
         
-        printf("\nSending %s request...\n", type_str);
+        printf("\n---> Sending message (type: %d, len: %" PRIu32 ")\n", header.type, header.length);
 
-        // 3. Send the message to the server
-        if (write_full(sockfd, &header, sizeof(MessageHeader)) != 0) {
-            fprintf(stderr, "Failed to write header. Shutting down.\n");
-            break;
-        }
-        if (header.message_len > 0) {
-            if (write_full(sockfd, body, header.message_len) != 0) {
-                fprintf(stderr, "Failed to write body. Shutting down.\n");
-                free(body);
-                break;
-            }
-        }
-        free(body);
+        // 3. Send message to server (header then body)
+        MessageHeader net_header = { .type = htonl(header.type), .length = htonl(header.length) };
+        if (robust_write(sock_fd, &net_header, sizeof(net_header)) == -1) break;
+        if (robust_write(sock_fd, body, header.length) == -1) break;
+        DEBUG_LOG("Message sent successfully.");
 
-        // 4. Read the response from the server
-        MessageHeader response_header;
-        if (read_full(sockfd, &response_header, sizeof(MessageHeader)) != 0) {
-            fprintf(stderr, "Server closed connection or error while reading response header. Shutting down.\n");
-            break;
+        // 4. Read response from server
+        MessageHeader resp_header = {0};
+        if (robust_read(sock_fd, &resp_header, sizeof(resp_header)) == -1) break;
+
+        resp_header.type = ntohl(resp_header.type);
+        resp_header.length = ntohl(resp_header.length);
+
+        if (resp_header.length > 4096) {
+             fprintf(stderr, "Server response too large (%" PRIu32 " bytes). Aborting.\n", resp_header.length);
+             break;
         }
 
-        if (response_header.message_len > 0 && response_header.message_len < RESPONSE_BUFFER_SIZE) {
-            if (read_full(sockfd, response_buffer, response_header.message_len) != 0) {
-                fprintf(stderr, "Error reading response body. Shutting down.\n");
-                break;
-            }
-            // Ensure null termination for printing
-            response_buffer[response_header.message_len - 1] = '\0';
-            printf("Server response: [Type: %" PRIu32 ", Len: %" PRIu32 "] Body: \"%s\"\n", 
-                   response_header.type, response_header.message_len, response_buffer);
-        } else if (response_header.message_len >= RESPONSE_BUFFER_SIZE) {
-            fprintf(stderr, "Server response too large for buffer. Shutting down.\n");
-            break;
-        } else {
-            // Response with no body, e.g. an ACK
-            printf("Server response: [Type: %" PRIu32 ", Len: 0] (No body)\n", response_header.type);
-        }
+        char resp_body[resp_header.length];
+        if (robust_read(sock_fd, resp_body, resp_header.length) == -1) break;
+
+        printf("<--- Received response (type: %" PRIu32 ", len: %" PRIu32 ")\n", resp_header.type, resp_header.length);
+        printf("     Body: \"%s\"\n", resp_body);
     }
 
-    printf("\nSignal caught, shutting down gracefully...\n");
-    close(sockfd);
+    printf("\nShutdown signal received. Closing connection.\n");
+    close(sock_fd);
     return EXIT_SUCCESS;
+}
+
+ssize_t robust_read(int fd, void *buf, size_t count) {
+    assert(buf != NULL);
+    assert(fd >= 0);
+
+    size_t total_read = 0;
+    while (total_read < count) {
+        ssize_t bytes_read = read(fd, (char*)buf + total_read, count - total_read);
+        if (bytes_read == -1) {
+            perror("robust_read");
+            return -1;
+        }
+        if (bytes_read == 0) { // Peer closed connection
+            fprintf(stderr, "Server closed the connection.\n");
+            return -1;
+        }
+        total_read += bytes_read;
+    }
+    return total_read;
+}
+
+ssize_t robust_write(int fd, const void *buf, size_t count) {
+    assert(buf != NULL);
+    assert(fd >= 0);
+
+    size_t total_written = 0;
+    while (total_written < count) {
+        ssize_t written = write(fd, (const char*)buf + total_written, count - total_written);
+        if (written == -1) {
+            perror("robust_write");
+            return -1;
+        }
+        total_written += written;
+    }
+    return total_written;
 }
