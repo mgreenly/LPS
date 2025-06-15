@@ -1,0 +1,58 @@
+When writing "C" programs the target platform is both x86_86 and AARCH64 Linux.
+
+When writing "C" programs set the compiler flags for the C17 ISO/IEC 9899:2018 standards.
+
+When writing "C" programs include compiler flags to define both _POSIX_C_SOURCE and _DEFAULT_SOURCE
+
+When writing "C" programs never include _POSIX_C_SOURCE and _DEFAULT_SOURCE in the header files.
+
+When writing "C" programs always use the fixed width integer types defined in "stdint.h" and the fixed width string formatting defined in "inttypes.h".
+
+When writing "C" programs provide a makefile.
+
+When writing "C" programs assume the program is intended for production use.
+
+When writing "C" programs provide an explanation appropriate for an experienced engineer.
+
+When writing programs create a graphviz dot file that explains the logical flow of the program.
+
+When creating *.dot files provide instructions for turning them into *.png files.
+
+Write a "C" program named "server".
+
+The server program should be a simple hello world application that prints "Hello from the server".
+
+The server prgram should be a single threaded network model using epoll to read message data.
+
+The server program should accept many long running connections on localhost port 4242
+
+The server program should expect a binary formatted message that consists of a fixed length header and a variable length body.
+
+The message header should consist of two fields, the message type and the message length.
+
+The message body should be a null terminated string.
+
+The message types should defined as an enum in a common "message.h" file shared by the clinet and server.
+
+Provide 3 example message types; echo, reverse and time.
+
+The "echo" message should generate a response to the client that is identical to the request.
+
+The "reverse" message should geneate a response to the client with the text message in the body reversed.
+
+The "time" message should generate a response to the client that contains an ISO8601 foramtted time.
+
+
+
+
+
+
+Write a "C" program named "client".
+
+The client program should connect to the server on localhost port 4242.
+
+The client program should run in a loop forever.
+
+The client program's main loop should randomly pause for 0.3 to 1.0 seconds then randomly select select and create one of the available messages and send it to the server.
+
+The client program should gracefully close it's network connections and terminate when it catches sigint or sigterm.

@@ -1,0 +1,38 @@
+// server_flow.dot
+digraph ServerFlow {
+    rankdir=LR;
+    node [shape=box, style=rounded];
+    
+    // States
+    Start [label="Start Server"];
+    Listening [label="Listening on Port"];
+    AcceptNew [label="Accept New Connection"];
+    ReadHeader [label="State: Read Header", shape=ellipse];
+    ReadBody [label="State: Read Body", shape=ellipse];
+    ProcessMsg [label="Process Message\n(Echo/Reverse/Time)"];
+    WriteResponse [label="State: Write Response", shape=ellipse, color=blue, fontcolor=blue];
+    CloseConn [label="Close Connection"];
+    End [label="End"];
+
+    // Transitions
+    Start -> Listening [label="socket(), bind(), listen()"];
+    Listening -> AcceptNew [label="epoll_wait() -> Listener FD\naccept()"];
+    
+    AcceptNew -> ReadHeader [label="Set non-blocking\nAdd to epoll (EPOLLIN)"];
+    
+    ReadHeader -> ReadBody [label="read() -> enough bytes\nfor header"];
+    ReadHeader -> ReadHeader [label="read() -> partial header"];
+    
+    ReadBody -> ProcessMsg [label="read() -> full message body\n(header + body)"];
+    ReadBody -> ReadBody [label="read() -> partial body"];
+
+    ProcessMsg -> WriteResponse [label="Prepare response buffer\nModify epoll (EPOLLOUT)"];
+
+    WriteResponse -> WriteResponse [label="write() -> partial response"];
+    WriteResponse -> ReadHeader [label="write() -> full response\nModify epoll (EPOLLIN)", color=blue, fontcolor=blue];
+
+    // Error/Close paths
+    {ReadHeader, ReadBody, WriteResponse} -> CloseConn [label="read()=0 or Error\nEPOLLHUP/EPOLLERR", style=dashed, color=red];
+    Listening -> End [label="Shutdown", style=dashed, color=red];
+    CloseConn -> Listening [label="Cleanup resources"];
+}
