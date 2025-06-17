@@ -6,16 +6,18 @@ When writing "C" programs set the compiler flag to use the C18 ISO/IEC 9899:2018
 
 When writing "C" programs set the compiler flag to use the feature test macro _DEFAULT_SOURCE.
 
-When writing "C" programs do not add the _DEFAULT_SOURCE definition to the source code.
-
 When writing "C" programs use the fixed width integer types defined in "stdint.h".
 
 When writing "C" programs use the fixed width string formatting defined in "inttypes.h".
 
-When writing "C" programs provide an annotated makefile.
+When writing "C" programs assume they are for production use.
 
-When writing "C" programs assume they are intended for production use.
+When writing "C" programs provide an annotated makefile.
 
 When writing "C" programs provide an explanation appropriate for an experienced engineer.
 
-Write a "C" program named "hello-world".
+Write a "C" program named "demo".
+
+The demo should contain a version definition equal to "0.1.0".
+
+The demo should print "Hello world!" and it's version when run.
