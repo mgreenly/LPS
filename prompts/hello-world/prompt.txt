@@ -1,12 +1,20 @@
-When writing "C" programs the target platform is both x86_86 and AARCH64 Linux.
+When writing "C" programs assume Linux is the target platform.
 
-When writing "C" programs set the compiler flags for the C17 ISO/IEC 9899:2018 standards.
+When writing "C" programs assume x86_64 is the target architecture.
 
-When writing "C" programs use the fixed width integer types defined in "stdint.h" and the fixed width string formatting defined in "inttypes.h".
+When writing "C" programs set the compiler flag to use the C18 ISO/IEC 9899:2018 standards.
 
-When writing "C" programs provide a makefile.
+When writing "C" programs set the compiler flag to use the feature test macro _DEFAULT_SOURCE.
 
-When writing "C" programs assume the program is intended for production use.
+When writing "C" programs do not add the _DEFAULT_SOURCE definition to the source code.
+
+When writing "C" programs use the fixed width integer types defined in "stdint.h".
+
+When writing "C" programs use the fixed width string formatting defined in "inttypes.h".
+
+When writing "C" programs provide an annotated makefile.
+
+When writing "C" programs assume they are intended for production use.
 
 When writing "C" programs provide an explanation appropriate for an experienced engineer.
 
