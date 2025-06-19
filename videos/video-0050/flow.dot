@@ -1,0 +1,94 @@
+// flow.dot
+
+digraph SystemFlow {
+    rankdir=TB;
+    splines=ortho;
+    node [shape=box, style="rounded,filled", fillcolor=lightgrey];
+
+    subgraph cluster_client {
+        label="Client Application";
+        style=filled;
+        color=lightblue;
+
+        c_start [label="Start Client", shape=ellipse, fillcolor=palegreen];
+        c_connect [label="Connect to Server\n(localhost:4242)"];
+        c_loop [label="Loop (while running)", shape=Mdiamond];
+        c_pause [label="Pause\n(0.3-1.0s)"];
+        c_select [label="Randomly Select\nMessage Type"];
+        c_send [label="Create & Send Message"];
+        c_recv [label="Receive Response"];
+        c_log [label="Log Response"];
+        c_sig [label="SIGINT / SIGTERM ?", shape=diamond, fillcolor=lightpink];
+        c_close [label="Close Connection"];
+        c_end [label="End", shape=ellipse, fillcolor=salmon];
+
+        c_start -> c_connect;
+        c_connect -> c_loop;
+        c_loop -> c_sig;
+        c_sig -> c_pause [label="No"];
+        c_sig -> c_close [label="Yes"];
+        c_pause -> c_select -> c_send -> c_recv -> c_log -> c_loop;
+        c_close -> c_end;
+    }
+
+    subgraph cluster_server {
+        label="Server Application";
+        style=filled;
+        color=lightyellow;
+
+        subgraph cluster_main {
+            label="Main Thread";
+            style=filled;
+            color=lightgoldenrodyellow;
+
+            s_start [label="Start Server", shape=ellipse, fillcolor=palegreen];
+            s_setup [label="Setup\n(Signals, Socket, Workers)"];
+            s_epoll_create [label="Create Epoll Instance"];
+            s_epoll_wait [label="epoll_wait\n(block for I/O)"];
+            s_event_check [label="Event Ready?", shape=diamond];
+            s_new_conn [label="New Connection?", shape=diamond];
+            s_accept [label="accept()\nAdd to Epoll"];
+            s_read [label="Read Data from Socket"];
+            s_full_msg [label="Full Message\nReceived?", shape=diamond];
+            s_push_queue [label="Push WorkItem\nto Queue", shape=box, fillcolor=khaki];
+            s_shutdown [label="Shutdown Workers\n& Cleanup"];
+            s_end [label="End", shape=ellipse, fillcolor=salmon];
+
+            s_start -> s_setup -> s_epoll_create -> s_epoll_wait;
+            s_epoll_wait -> s_event_check;
+            s_event_check -> s_epoll_wait [label="No (timeout)"];
+            s_event_check -> s_new_conn [label="Yes"];
+            s_new_conn -> s_accept [label="Yes"];
+            s_new_conn -> s_read [label="No (Data)"];
+            s_accept -> s_epoll_wait;
+            s_read -> s_full_msg;
+            s_full_msg -> s_epoll_wait [label="No"];
+            s_full_msg -> s_push_queue [label="Yes"];
+            s_push_queue -> s_epoll_wait;
+            s_epoll_wait -> s_shutdown [label="g_running == 0"];
+            s_shutdown -> s_end;
+        }
+
+        subgraph cluster_workers {
+            label="Worker Pool (N Threads)";
+            style=filled;
+            color=lightcyan;
+            
+            w_start [label="Start Worker", shape=ellipse, fillcolor=palegreen];
+            w_pop_queue [label="Pop WorkItem\nfrom Queue (blocks)", shape=box, fillcolor=khaki];
+            w_process [label="Process Message\n(echo, reverse, time)"];
+            w_send [label="Send Response\nto Client"];
+            w_loop_check [label="Running?", shape=diamond];
+
+            w_start -> w_pop_queue;
+            w_pop_queue -> w_loop_check;
+            w_loop_check -> w_process [label="Yes"];
+            w_process -> w_send -> w_pop_queue;
+            w_loop_check -> s_end [label="No (Poison Pill)"];
+        }
+    }
+    
+    // Connections between threads
+    s_push_queue -> w_pop_queue [label="WorkItem", style=dashed, constraint=false];
+
+}

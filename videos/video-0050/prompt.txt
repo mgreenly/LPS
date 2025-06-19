@@ -1,0 +1,76 @@
+Write a "C" program named "server".
+
+The server program should gracefully close it's network connections and terminate when on sigint and sigterm.
+
+The server should should accept many long running network connections on localhost port 4242
+
+The server should provide a epoll loop in the main thread that pushes messages on to a queue.
+
+The server should provide a worker pool that processes the messages on the queue.
+
+The server should expect messages to have a fixed length binary header followed by a variable length body.
+
+The message header should consist of two fields, the message type and the message length.
+
+The message body should consist of a null terminated string.
+
+The message types should be defined as an enum in a "message.h" file shared by the client and server.
+
+Provide 3 example message types; echo, reverse and time.
+
+The "echo" message should generate a response to the client that is identical to the request.
+
+The "reverse" message should geneate a response to the client with the text in the body reversed.
+
+The "time" message should generate a response to the client that contains an ISO8601 foramtted time string.
+
+
+
+
+Write a "C" program named "client".
+
+The client program should connect to the server on localhost port 4242.
+
+The client program should run in a loop forever.
+
+The client program's main loop should randomly pause for 0.3 to 1.0 seconds then randomly select select and create one of the available messages and send it to the server.
+
+The client program should gracefully close it's network connections and terminate when it catches sigint or sigterm.
+
+
+
+
+When writing programs create a graphviz dot file that explains the logical flow of of all programs.
+
+When writing dot files use a vertical layout.
+
+When creating *.dot files in clude a makefile target to turn them into *.png files.
+
+
+
+
+When writing "C" programs assume Linux is the target platform.
+
+When writing "C" programs assume x86_64 is the target architecture.
+
+When writing "C" programs set the compiler flag to use the C18 ISO/IEC 9899:2018 standards.
+
+When writing "C" programs set the compiler flag to only use the feature test macro _DEFAULT_SOURCE.
+
+When writing "C" programs never include feature test macro definitions in the source code.
+
+When writing "C" programs do not define any other feature test macros.
+
+When writing "C" programs use the fixed width integer types defined in "stdint.h".
+
+When writing "C" programs use the fixed width string formatting defined in "inttypes.h".
+
+When writing "C" programs assume they are for production use.
+
+When writing "C" programs provide an annotated makefile with all targets.
+
+When writing "C" programs provide an explanation appropriate for an experienced engineer.
+
+When writing "C" programs make liberal use of asserts to check for valid function arguments.
+
+When writing "C" programs make liberal use of logging.
