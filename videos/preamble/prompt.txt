@@ -16,6 +16,13 @@ When writing "C" programs provide an annotated makefile.
 
 When writing "C" programs provide an explanation appropriate for an experienced engineer.
 
+When writing "C" programs make liberal use of asserts to check for valid function arguments.
+
+When writing "C" programs make liberal use of debug logging.
+
+
+
+
 Write a "C" program named "demo".
 
 The demo should contain a version definition equal to "0.1.0".

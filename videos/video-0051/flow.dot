@@ -1,0 +1,51 @@
+digraph ServerClientFlow {
+    rankdir=TB;
+    splines=ortho;
+    node [shape=box, style=rounded];
+
+    subgraph cluster_client {
+        label="Client Program";
+        style="rounded,dashed";
+        client_main [label="Client Main Loop"];
+        client_send [label="Send Request"];
+        client_recv [label="Receive Response"];
+        client_main -> client_send -> client_recv -> client_main;
+    }
+
+    subgraph cluster_server {
+        label="Server Program";
+        style="rounded,dashed";
+
+        subgraph cluster_main_thread {
+            label="Main Thread";
+            style="rounded";
+            server_main [label="Epoll Wait Loop"];
+            server_accept [label="Accept Connection"];
+            server_read [label="Read Full Message"];
+            server_main -> server_accept [label="New Connection"];
+            server_main -> server_read [label="Socket Readable"];
+        }
+
+        subgraph cluster_worker_pool {
+            label="Worker Pool";
+            style="rounded";
+            worker [label="Worker Thread"];
+            process_msg [label="Process Message\n(echo, reverse, time)"];
+            send_response [label="Send Response"];
+            worker -> process_msg -> send_response;
+        }
+
+        queue [label="Thread-Safe\nMessage Queue", shape=cylinder];
+    }
+
+    // Connections
+    client_send -> server_accept [label="1. TCP Connect/Send"];
+    server_read -> queue [label="2. Push Request"];
+    queue -> worker [label="3. Pop Request"];
+    send_response -> client_recv [label="4. Send Response"];
+
+    // Signals
+    sigint [label="SIGINT / SIGTERM", shape=diamond, color=red];
+    sigint -> client_main [color=red, style=dashed, label="shutdown"];
+    sigint -> server_main [color=red, style=dashed, label="shutdown"];
+}

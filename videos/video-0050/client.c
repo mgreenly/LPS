@@ -27,7 +27,7 @@ static volatile sig_atomic_t g_running = 1;
 void handle_signal(int signal) {
     (void)signal;
     g_running = 0;
-    log_info("Shutdown signal received, terminating gracefully.");
+    log_info("%s","Shutdown signal received, terminating gracefully.");
 }
 
 void setup_signal_handlers() {
@@ -76,7 +76,7 @@ int main() {
 
     int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (sock_fd < 0) {
-        log_error("Failed to create socket");
+        log_error("%s", "Failed to create socket");
         return EXIT_FAILURE;
     }
 
@@ -85,13 +85,13 @@ int main() {
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(PORT);
     if (inet_pton(AF_INET, HOST, &serv_addr.sin_addr) <= 0) {
-        log_error("Invalid address or address not supported");
+        log_error("%s", "Invalid address or address not supported");
         close(sock_fd);
         return EXIT_FAILURE;
     }
 
     if (connect(sock_fd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
-        log_error("Connection failed");
+        log_error("%s", "Connection failed");
         close(sock_fd);
         return EXIT_FAILURE;
     }
@@ -126,7 +126,7 @@ int main() {
 
         // 3. Send message to server
         if (full_write(sock_fd, request_buf, total_len) < 0) {
-            log_error("Failed to send message");
+            log_error("%s", "Failed to send message");
             free(request_buf);
             break;
         }
@@ -135,7 +135,7 @@ int main() {
         // 4. Receive response from server
         MessageHeader resp_header;
         if (full_read(sock_fd, &resp_header, sizeof(resp_header)) != sizeof(resp_header)) {
-            log_error("Failed to read response header or server disconnected");
+            log_error("%s", "Failed to read response header or server disconnected");
             break;
         }
 
@@ -146,7 +146,7 @@ int main() {
 
         char resp_body[MAX_MSG_BODY_LEN];
         if (full_read(sock_fd, resp_body, resp_header.length) != (ssize_t)resp_header.length) {
-            log_error("Failed to read response body or server disconnected");
+            log_error("%s", "Failed to read response body or server disconnected");
             break;
         }
 
@@ -154,9 +154,9 @@ int main() {
                  resp_header.type, resp_header.length, resp_body);
     }
 
-    log_info("Shutting down client...");
+    log_info("%s", "Shutting down client...");
     close(sock_fd);
-    log_info("Client shut down cleanly.");
+    log_info("%s", "Client shut down cleanly.");
 
     return EXIT_SUCCESS;
 }

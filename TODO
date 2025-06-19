@@ -1,0 +1,18 @@
+### Things Check Out
+  * GNU Gettext - https://www.labri.fr/perso/fleury/posts/programming/a-quick-gettext-tutorial.html
+
+TODO
+  * Use Gemini to rewrite the network/thread code
+  * Use Gemini to write the first pass on a client
+  * Support release build with -DNDEBUG
+  * Support Linux x86_64 target
+  * support OSX arm64-apple-darwin target
+  * Support Windows x86_64 target
+
+DONE
+  * Use stdint & inttypes
+
+CHECKOUT
+  * https://github.com/nivox/quickcheck4c
+  * https://github.com/google/oss-fuzz
+  * https://www.doxygen.nl/

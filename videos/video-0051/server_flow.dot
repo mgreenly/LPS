@@ -1,0 +1,72 @@
+digraph ServerLogic {
+    rankdir=TB;
+    node [shape=box, style="rounded,filled", fillcolor=lightgrey];
+    edge [fontsize=10];
+
+    // Nodes
+    start [label="Start Server", shape=ellipse, fillcolor=lightblue];
+    setup_socket [label="Create, Bind & Listen on\nlocalhost:4242"];
+    set_nonblocking [label="Set Listen Socket to Non-Blocking"];
+    create_epoll [label="Create Epoll Instance\n(epoll_create1)"];
+    add_listen_fd [label="Add Listen FD to Epoll\n(EPOLLIN | EPOLLET)"];
+    epoll_loop [label="epoll_wait()", shape=diamond, fillcolor=yellow];
+
+    event_is_listen [label="Event on Listen FD?", shape=diamond];
+    accept_loop [label="Loop: accept()"];
+    set_conn_nonblocking [label="Set New Connection Non-Blocking"];
+    add_client_fd [label="Add Client FD to Epoll"];
+
+    event_is_client [label="Event on Client FD?"];
+    process_event [label="Process Client Event\n(EPOLLIN | EPOLLHUP | EPOLLERR)"];
+    read_header [label="read_full(header)"];
+    
+    read_ok [label="Read OK?", shape=diamond];
+    
+    read_body [label="malloc(body) & read_full(body)"];
+    
+    process_message [label="Switch on Message Type"];
+    
+    handle_echo [label="Handle Echo:\nWrite back original message", fillcolor=honeydew];
+    handle_reverse [label="Handle Reverse:\nReverse string, write back", fillcolor=honeydew];
+    handle_time [label="Handle Time:\nFormat ISO8601 time, write back", fillcolor=honeydew];
+    
+    client_closed [label="Client Disconnected (read EOF)\nor Error", fillcolor=mistyrose];
+    close_fd [label="Close Client FD\nRemove from Epoll"];
+
+    // Flow
+    start -> setup_socket;
+    setup_socket -> set_nonblocking;
+    set_nonblocking -> create_epoll;
+    create_epoll -> add_listen_fd;
+    add_listen_fd -> epoll_loop;
+
+    epoll_loop -> event_is_listen [label="Event(s) Ready"];
+    event_is_listen -> accept_loop [label="Yes"];
+    event_is_listen -> event_is_client [label="No"];
+    
+    accept_loop -> set_conn_nonblocking [label="Connection accepted"];
+    accept_loop -> event_is_client [label="EAGAIN (no more connections)"];
+    set_conn_nonblocking -> add_client_fd;
+    add_client_fd -> accept_loop; // Loop for more accepts
+
+    event_is_client -> process_event [label="Yes"];
+    event_is_client -> epoll_loop [label="No (next event)"];
+    
+    process_event -> read_header;
+    read_header -> read_ok;
+    
+    read_ok -> read_body [label="Yes"];
+    read_ok -> client_closed [label="No (EOF/Error)"];
+    
+    read_body -> process_message;
+    process_message -> handle_echo [label="MSG_ECHO"];
+    process_message -> handle_reverse [label="MSG_REVERSE"];
+    process_message -> handle_time [label="MSG_TIME"];
+    
+    handle_echo -> epoll_loop;
+    handle_reverse -> epoll_loop;
+    handle_time -> epoll_loop;
+    
+    client_closed -> close_fd;
+    close_fd -> epoll_loop;
+}

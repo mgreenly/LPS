@@ -8,7 +8,7 @@ CC = gcc
 # -Wall -Wextra -Wpedantic: Enable a wide range of warnings for code quality.
 # -g: Include debug symbols for use with gdb.
 # -D_DEFAULT_SOURCE: Use modern POSIX feature test macro.
-CFLAGS = -std=c18 -Wall -Wextra -g -D_DEFAULT_SOURCE
+CFLAGS = -std=c18 -Wall -Wextra -g -Wpedantic -D_DEFAULT_SOURCE
 
 # LDFLAGS: Linker flags.
 # -lpthread: Link against the POSIX threads library (for the server).
